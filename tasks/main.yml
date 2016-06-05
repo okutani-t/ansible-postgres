@@ -1,0 +1,92 @@
+---
+- name: install the postgres from a remote repo
+  yum:
+    name: "{{ postgres_url }}"
+    state: present
+  failed_when: False
+
+- name: replace pgdg-95-centos.repo enable=1
+  replace:
+    dest: /etc/yum.repos.d/pgdg-95-centos.repo
+    regexp: "enabled *= *1"
+    replace: "enabled=0"
+
+- name: install the postgresql
+  yum: name={{ item }} state=latest enablerepo=pgdg95
+  with_items:
+    - postgresql95-server
+    - postgresql95-devel
+    - postgresql95-contrib
+    - python-psycopg2
+
+- name: postgresql initdb
+  shell: /usr/pgsql-9.5/bin/postgresql95-setup initdb
+  failed_when: False
+  register: postgresql_initdb_result
+
+- debug: var=postgresql_initdb_result.failed
+
+- name: start and enabled postgresql
+  service: name=postgresql-9.5 state=started enabled=yes
+
+- name: change true global access postgres
+  replace: >
+    dest=/var/lib/pgsql/9.5/data/postgresql.conf
+    regexp="#listen_addresses *= *'localhost'"
+    replace="listen_addresses = '*'"
+  notify: restart postgres
+
+- name: change postgres port
+  replace: >
+    dest=/var/lib/pgsql/9.5/data/postgresql.conf
+    regexp="#port *= *5432"
+    replace="port = {{ database_port }}"
+  notify: restart postgres
+
+- name: copy client authentication configuration file
+  copy:
+    src: pg_hba.conf
+    dest: /var/lib/pgsql/9.5/data/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: 0640
+  notify: restart postgres
+
+- name: add postgres password
+  user:
+    name: postgres
+    password: "{{ postgres_user_pass }}"
+    state: present
+
+- name: user join to postgres group
+  user:
+    name: "{{ user_name }}"
+    append: yes
+    groups: postgres
+
+- name: create a postgres user
+  postgresql_user:
+    name: "{{ database_user }}"
+    password: "{{ database_pass }}"
+  become_user: postgres
+
+- name: create the database
+  postgresql_db:
+    name: "{{ database_name }}"
+    owner: "{{ database_user }}"
+    encoding: UTF8
+    lc_ctype: "{{ locale }}"
+    lc_collate: "{{ locale }}"
+    template: template0
+  become_user: postgres
+
+- name: postgres user sudores
+  lineinfile:
+    dest: /etc/sudoers.d/postgres
+    owner: root
+    group: root
+    mode: 0440
+    line: "%{{ database_user }} ALL=(postgres) NOPASSWD: ALL"
+    state: present
+    create: yes
+    validate: "visudo -cf %s"

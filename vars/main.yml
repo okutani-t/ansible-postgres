@@ -1,0 +1,4 @@
+---
+postgres_url: https://download.postgresql.org/pub/repos/yum/9.5/redhat/rhel-7-x86_64/pgdg-centos95-9.5-2.noarch.rpm
+# openssl passwd -salt SALT -1 postgres
+postgres_user_pass: $1$SALT$ZBPxk/6pU/1LJ4B87zggM/
