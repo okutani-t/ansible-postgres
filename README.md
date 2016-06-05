@@ -1,4 +1,4 @@
-# ansible-postgres
+# PostgreSQL Role
 
 Ansible postgres role for centos7.
 
